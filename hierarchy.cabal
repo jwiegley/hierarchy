@@ -1,7 +1,7 @@
 name:          hierarchy
-version:       0.1.0.0
-synopsis:      Provide a TreeT type for generating trees, as ListT does for lists.
-description:   Provide a TreeT type for generating trees, as ListT does for lists.
+version:       0.1.0
+synopsis:      Pipes-based library for predicated traversal of generated trees
+description:   Pipes-based library for predicated traversal of generated trees
 homepage:      https://github.com/jwiegley/hierarchy
 license:       BSD3
 license-file:  LICENSE
