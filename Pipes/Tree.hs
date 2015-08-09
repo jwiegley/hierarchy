@@ -12,11 +12,15 @@ import Pipes
 import System.Directory
 import System.Posix.Files
 
+-- | A 'TreeT' is a tree of values, where the (possible) branches are
+-- 'ListT's.
 type TreeT m = CofreeT Maybe (ListT m)
 
+-- | Turn an old-style generated list into a 'ListT'.
 selectEach :: Monad m => m [a] -> ListT m a
 selectEach m = Select $ each =<< lift m
 
+-- | Return all files within a directory tree, hierarchically.
 directoryFiles :: MonadIO m => FilePath -> TreeT m FilePath
 directoryFiles path = CofreeT $ Select $ do
     eres <- liftIO $ try $ getDirectoryContents path
@@ -45,11 +49,8 @@ descend (CofreeT (Select t)) = Select $ for t $ \(a :< mp) -> yield (a, mp)
 -- contents. Note that breadth-first traversals cannot offer static memory
 -- guarantees, so they are not provided by this module.
 walk :: Monad m => TreeT m a -> ListT m a
-walk (CofreeT (Select t)) = Select $ for t $ \(a :< mp) -> do
-    yield a
-    case mp of
-        Nothing -> return ()
-        Just p  -> enumerate (walk p)
+walk (CofreeT (Select t)) = Select $ for t $ \(a :< mp) ->
+    yield a >> maybe (return ()) (enumerate . walk) mp
 {-# INLINEABLE walk #-}
 
 -- | Given a 'TreeT', produce another 'TreeT' which yields only those elements
@@ -62,17 +63,18 @@ walk (CofreeT (Select t)) = Select $ for t $ \(a :< mp) -> do
 -- For example, to print all Haskell files under the current directory:
 --
 -- @
---     let files = winnow (directoryFiles ".") $
---             guard_ (".hs" `isSuffixOf`)
+--     let files = winnow (directoryFiles ".") $ do
+--             path <- ask
+--             liftIO $ putStrLn $ "Considering " ++ path
+--             when (path @`elem@` [".@/@.git", ".@/@dist", ".@/@result"])
+--                 prune  -- ignore these, and don't recurse into them
+--             guard_ (".hs" @`isInfixOf@`)  -- implicitly references 'path'
 --     runEffect $ for (enumerate (walk files)) $ liftIO . print
 -- @
 winnow :: Monad m => TreeT m a -> CondT a m () -> TreeT m a
 winnow (CofreeT (Select t)) p = CofreeT $ Select $ for t $ \(a :< mst) -> do
-    (res, a') <- lift $ applyCondT a p
-    case res of
-        (Nothing, Nothing) -> return ()
-        (Just (), Nothing) -> yield (a' :< Nothing)
-        (Nothing, Just n)  -> case mst of
-            Nothing -> return ()
-            Just st -> enumerate $ runCofreeT $ winnow st n
-        (Just (), Just n)  -> yield $ a' :< (flip winnow n <$> mst)
+    (mval, mnext) <- lift $ applyCondT a p
+    let mnext' = winnow <$> mst <*> mnext
+    case mval of
+        Nothing -> maybe (return ()) (enumerate . runCofreeT) mnext'
+        Just a' -> yield (a' :< mnext')
