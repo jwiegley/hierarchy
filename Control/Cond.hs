@@ -10,7 +10,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 module Control.Cond
-    ( CondT(..), Cond, cond
+    ( CondT(..), Cond, CondR, cond
 
     -- * Executing CondT
     , runCondT, runCond, applyCondT, applyCond
