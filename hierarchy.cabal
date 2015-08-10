@@ -1,5 +1,5 @@
 name:          hierarchy
-version:       0.2.0
+version:       0.2.1
 synopsis:      Pipes-based library for predicated traversal of generated trees
 description:   Pipes-based library for predicated traversal of generated trees
 homepage:      https://github.com/jwiegley/hierarchy
