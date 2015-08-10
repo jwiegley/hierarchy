@@ -36,8 +36,8 @@ findsExpected = do
             liftIO $ putStrLn "We found a Haskell file!"
 
     found <- toListM $ enumerate (walk files)
-    found `shouldBe` [ "./Control/Cond.hs"
-                     , "./Pipes/Tree.hs"
-                     , "./Setup.hs"
-                     , "./test/doctest.hs"
-                     , "./test/Main.hs" ]
+    sort found `shouldBe` [ "./Control/Cond.hs"
+                          , "./Pipes/Tree.hs"
+                          , "./Setup.hs"
+                          , "./test/Main.hs"
+                          , "./test/doctest.hs" ]
