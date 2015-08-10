@@ -5,7 +5,7 @@
 }:
 mkDerivation {
   pname = "hierarchy";
-  version = "0.1.1";
+  version = "0.2.0";
   src = ./.;
   libraryHaskellDepends = [
     base directory exceptions free mmorph monad-control mtl pipes
