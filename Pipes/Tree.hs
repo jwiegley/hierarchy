@@ -6,11 +6,7 @@ module Pipes.Tree where
 import Control.Applicative
 import Control.Comonad.Trans.Cofree
 import Control.Cond
-import Control.Exception
-import Control.Monad
 import Pipes
-import System.Directory
-import System.Posix.Files
 
 -- | A 'TreeT' is a tree of values, where the (possible) branches are
 -- 'ListT's.
@@ -19,25 +15,6 @@ type TreeT m = CofreeT Maybe (ListT m)
 -- | Turn a generated list into a 'ListT'.
 selectEach :: Monad m => m [a] -> ListT m a
 selectEach m = Select $ each =<< lift m
-
--- | Return all files within a directory tree, hierarchically.
-directoryFiles :: MonadIO m => FilePath -> TreeT m FilePath
-directoryFiles path = CofreeT $ Select $ do
-    eres <- liftIO $ try $ getDirectoryContents path
-    case eres of
-        Left (_ :: IOException) -> return ()
-            -- liftIO $ putStrLn $
-            --     "Error reading directory " ++ path ++ ": " ++ show e
-        Right entries -> forM_ entries $ \entry ->
-            unless (entry `elem` [".", ".."]) $ do
-                let entryPath = path ++ "/" ++ entry
-                estat <- liftIO $ try $ getFileStatus entryPath
-                case estat of
-                    Left (_ :: IOException) -> return ()
-                    Right stat ->
-                        yield (entryPath :< if isDirectory stat
-                                            then Just (directoryFiles entryPath)
-                                            else Nothing)
 
 -- | Descend one level into a 'TreeT', yielding a list of values and their
 -- possible associated trees.
@@ -73,7 +50,7 @@ walk (CofreeT (Select t)) = Select $ for t $ \(a :< mp) ->
 -- @
 winnow :: Monad m => TreeT m a -> CondT a m () -> TreeT m a
 winnow (CofreeT (Select t)) p = CofreeT $ Select $ for t $ \(a :< mst) -> do
-    (mval, mnext) <- lift $ applyCondT a p
+    (mval, mnext) <- lift $ execCondT a p
     let mnext' = winnow <$> mst <*> mnext
     case mval of
         Nothing -> maybe (return ()) (enumerate . runCofreeT) mnext'

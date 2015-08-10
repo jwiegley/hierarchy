@@ -10,6 +10,7 @@ import Data.List
 main :: IO ()
 main = getSources >>= \sources -> doctest $
     "-iControl"
+  : "-iPipes"
   : "-idist/build/autogen"
   : "-optP-include"
   : "-optPdist/build/autogen/cabal_macros.h"
@@ -17,7 +18,8 @@ main = getSources >>= \sources -> doctest $
 
 getSources :: IO [FilePath]
 getSources =
-    filter (\n -> ".hs" `isSuffixOf` n) <$> go "./Control"
+    filter (\n -> ".hs" `isSuffixOf` n) <$>
+        (liftA2 (++) (go "./Control") (go "./Pipes"))
   where
     go dir = do
       (dirs, files) <- getFilesAndDirectories dir

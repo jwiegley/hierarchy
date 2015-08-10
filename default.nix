@@ -1,15 +1,18 @@
 { mkDerivation, base, directory, exceptions, free, mmorph
 , monad-control, mtl, pipes, semigroups, stdenv, transformers
 , transformers-base, unix, doctest, hspec, hspec-expectations
-, transformers-compat
+, transformers-compat, attoparsec, bytestring, text, time, filepath
+, posix-paths, unix-compat, regex-posix, pipes-safe
 }:
 mkDerivation {
   pname = "hierarchy";
-  version = "0.2.1";
+  version = "0.3.0";
   src = ./.;
   libraryHaskellDepends = [
     base directory exceptions free mmorph monad-control mtl pipes
     semigroups transformers transformers-base transformers-compat unix
+    attoparsec bytestring text time filepath posix-paths unix-compat
+    regex-posix pipes-safe
   ];
   testHaskellDepends = [ doctest hspec hspec-expectations ];
   homepage = "https://github.com/jwiegley/hierarchy";
