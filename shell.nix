@@ -7,15 +7,15 @@ let
   f = { mkDerivation, base, directory, doctest, exceptions
       , filepath, free, hspec, hspec-expectations, mmorph, monad-control
       , mtl, pipes, semigroups, stdenv, transformers, transformers-base
-      , unix
+      , transformers-compat, unix
       }:
       mkDerivation {
         pname = "hierarchy";
-        version = "0.1.0";
+        version = "0.1.1";
         src = ./.;
         libraryHaskellDepends = [
           base directory exceptions free mmorph monad-control mtl pipes
-          semigroups transformers transformers-base unix
+          semigroups transformers transformers-base transformers-compat unix
         ];
         testHaskellDepends = [
           base directory doctest filepath hspec hspec-expectations mtl pipes

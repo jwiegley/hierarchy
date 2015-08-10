@@ -1,13 +1,17 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
+
+{-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 
 module Control.Cond
     ( CondT, Cond
@@ -16,7 +20,7 @@ module Control.Cond
     , runCondT, runCond, applyCondT
 
     -- * Promotions
-    , guardM, guard_, guardM_, apply, consider
+    , MonadQuery(..), guardM, guard_, guardM_, apply, consider
 
     -- * Basic conditionals
     , accept, ignore, norecurse, prune
@@ -24,28 +28,46 @@ module Control.Cond
     -- * Boolean logic
     , matches, if_, when_, unless_, or_, and_, not_
 
-    -- * Helper functions
+    -- * helper functions
     , recurse, test
     )
     where
 
-import Control.Applicative
-import Control.Arrow ((***), first)
-import Control.Monad hiding (mapM_, sequence_)
-import Control.Monad.Base
-import Control.Monad.Catch
-import Control.Monad.Morph
-import Control.Monad.Reader.Class
-import Control.Monad.State.Class
-import Control.Monad.Trans
-import Control.Monad.Trans.Control
-import Control.Monad.Trans.State (StateT(..), withStateT, evalStateT)
-import Data.Foldable
-import Data.Functor.Identity
-import Data.Maybe (isJust)
-import Data.Monoid hiding ((<>))
-import Data.Semigroup
-import Prelude hiding (mapM_, foldr1, sequence_)
+import           Control.Applicative
+import           Control.Arrow ((***))
+import           Control.Monad hiding (mapM_, sequence_)
+import           Control.Monad.Base
+import           Control.Monad.Catch
+import           Control.Monad.Cont.Class as C
+import           Control.Monad.Error.Class as E
+import           Control.Monad.Fix
+import           Control.Monad.Morph as M
+import           Control.Monad.Reader.Class as R
+import           Control.Monad.State.Class as S
+import           Control.Monad.Trans
+import           Control.Monad.Trans.Cont (ContT(..))
+import           Control.Monad.Trans.Control
+import           Control.Monad.Trans.Error (ErrorT(..))
+import           Control.Monad.Trans.Except (ExceptT(..))
+import           Control.Monad.Trans.Identity (IdentityT(..))
+import           Control.Monad.Trans.List (ListT(..))
+import           Control.Monad.Trans.Maybe (MaybeT(..))
+import qualified Control.Monad.Trans.RWS.Lazy as LazyRWS
+import qualified Control.Monad.Trans.RWS.Strict as StrictRWS
+import           Control.Monad.Trans.Reader (ReaderT(..))
+import           Control.Monad.Trans.State (StateT(..), evalStateT)
+import qualified Control.Monad.Trans.State.Lazy as Lazy
+import qualified Control.Monad.Trans.State.Strict as Strict
+import qualified Control.Monad.Trans.Writer.Lazy as Lazy
+import qualified Control.Monad.Trans.Writer.Strict as Strict
+import           Control.Monad.Writer.Class
+import           Control.Monad.Zip
+import           Data.Foldable
+import           Data.Functor.Identity
+import           Data.Maybe (isJust)
+import           Data.Monoid hiding ((<>))
+import           Data.Semigroup
+import           Prelude hiding (mapM_, foldr1, sequence_)
 
 data Recursor a m r = Stop | Recurse (CondT a m r) | Continue
     deriving Functor
@@ -161,20 +183,30 @@ instance Monad m => Monad (CondT a m) where
             x@_ -> return x
     {-# INLINEABLE (>>=) #-}
 
-instance Monad m => MonadReader a (CondT a m) where
-    ask               = CondT $ gets accept'
+instance MonadReader r m => MonadReader r (CondT a m) where
+    ask = lift R.ask
     {-# INLINE ask #-}
-    local f (CondT m) = CondT $ withStateT f m
+    local f (CondT m) = CondT $ R.local f m
     {-# INLINE local #-}
-    reader f          = liftM f ask
+    reader = lift . R.reader
     {-# INLINE reader #-}
 
-instance Monad m => MonadState a (CondT a m) where
-    get     = CondT $ gets accept'
+instance MonadWriter w m => MonadWriter w (CondT a m) where
+    writer   = lift . writer
+    {-# INLINE writer #-}
+    tell     = lift . tell
+    {-# INLINE tell #-}
+    listen m = m >>= lift . listen . return
+    {-# INLINE listen #-}
+    pass m   = m >>= lift . pass . return
+    {-# INLINE pass #-}
+
+instance MonadState s m => MonadState s (CondT a m) where
+    get = lift S.get
     {-# INLINE get #-}
-    put s   = CondT $ liftM accept' $ put s
+    put = lift . S.put
     {-# INLINE put #-}
-    state f = CondT $ state (fmap (first accept') f)
+    state = lift . S.state
     {-# INLINE state #-}
 
 instance (Monad m, Functor m) => Alternative (CondT a m) where
@@ -197,6 +229,10 @@ instance Monad m => MonadPlus (CondT a m) where
             _ -> g
     {-# INLINEABLE mplus #-}
 
+instance MonadError e m => MonadError e (CondT a m) where
+    throwError = CondT . throwError
+    catchError (CondT m) h = CondT $ m `catchError` \e -> getCondT (h e)
+
 instance MonadThrow m => MonadThrow (CondT a m) where
     throwM = CondT . throwM
     {-# INLINE throwM #-}
@@ -215,6 +251,7 @@ instance MonadMask m => MonadMask (CondT a m) where
         CondT $ uninterruptibleMask $ \u -> getCondT (a $ q u)
       where q u = CondT . u . getCondT
     {-# INLINEABLE uninterruptibleMask #-}
+
 
 instance MonadBase b m => MonadBase b (CondT a m) where
     liftBase m = CondT $ liftM accept' $ liftBase m
@@ -252,6 +289,27 @@ instance MonadBaseControl b m => MonadBaseControl b (CondT r m) where
 instance MFunctor (CondT a) where
     hoist nat (CondT m) = CondT $ hoist nat (fmap (hoist nat) `liftM` m)
     {-# INLINE hoist #-}
+
+-- This won't work for StateT-like types
+-- instance MMonad (CondT a) where
+--     embed f m = undefined
+--     {-# INLINE embed #-}
+
+instance MonadCont m => MonadCont (CondT a m) where
+    callCC f = CondT $ StateT $ \a ->
+        callCC $ \k -> flip runStateT a $ getCondT $ f $ \r ->
+            CondT $ StateT $ \a' -> k ((Just r, Continue), a')
+
+instance Monad m => MonadZip (CondT a m) where
+    mzipWith = liftM2
+
+-- A deficiency of this instance is that recursion uses the same initial 'a'.
+instance MonadFix m => MonadFix (CondT a m) where
+    mfix f = CondT $ StateT $ \a -> mdo
+        ((mb, n), a') <- case mb of
+            Nothing -> return ((mb, n), a')
+            Just b  -> runStateT (getCondT (f b)) a
+        return ((mb, n), a')
 
 runCondT :: Monad m => CondT a m r -> a -> m (Maybe r)
 runCondT (CondT f) a = fst `liftM` evalStateT f a
@@ -272,33 +330,121 @@ applyCondT a c@(CondT (StateT s)) = go `liftM` s a
     recursorToMaybe _ Stop        = Nothing
     recursorToMaybe p Continue    = Just p
     recursorToMaybe _ (Recurse n) = Just n
+{-# INLINEABLE applyCondT #-}
 
-{-# INLINE applyCondT #-}
+-- | 'MonadQuery' is a custom version of 'MonadReader', created so that users
+-- could still have their own 'MonadReader' accessible within conditionals.
+class Monad m => MonadQuery a m | m -> a where
+    query :: m a
+    queries :: (a -> b) -> m b
+    update :: a -> m ()
+
+instance Monad m => MonadQuery a (CondT a m) where
+    -- | Returns the item currently under consideration.
+    query = CondT $ gets accept'
+    {-# INLINE query #-}
+
+    -- | Returns the item currently under consideration while applying a
+    -- function, in the spirit of 'asks'.
+    queries f = CondT $ state (\a -> (accept' (f a), a))
+    {-# INLINE queries #-}
+
+    update a = CondT $ liftM accept' $ put a
+    {-# INLINE update #-}
+
+instance MonadQuery r m => MonadQuery r (ReaderT r m) where
+    query = lift query
+    queries = lift . queries
+    update = lift . update
+
+instance (MonadQuery r m, Monoid w) => MonadQuery r (LazyRWS.RWST r w s m) where
+    query = lift query
+    queries = lift . queries
+    update = lift . update
+
+instance (MonadQuery r m, Monoid w)
+         => MonadQuery r (StrictRWS.RWST r w s m) where
+    query = lift query
+    queries = lift . queries
+    update = lift . update
+
+-- All of these instances need UndecidableInstances, because they do not satisfy
+-- the coverage condition.
+
+instance MonadQuery r' m => MonadQuery r' (ContT r m) where
+    query   = lift query
+    queries = lift . queries
+    update = lift . update
+
+instance (Error e, MonadQuery r m) => MonadQuery r (ErrorT e m) where
+    query   = lift query
+    queries = lift . queries
+    update = lift . update
+
+instance MonadQuery r m => MonadQuery r (ExceptT e m) where
+    query   = lift query
+    queries = lift . queries
+    update = lift . update
+
+instance MonadQuery r m => MonadQuery r (IdentityT m) where
+    query   = lift query
+    queries = lift . queries
+    update = lift . update
+
+instance MonadQuery r m => MonadQuery r (ListT m) where
+    query   = lift query
+    queries = lift . queries
+    update = lift . update
+
+instance MonadQuery r m => MonadQuery r (MaybeT m) where
+    query   = lift query
+    queries = lift . queries
+    update = lift . update
+
+instance MonadQuery r m => MonadQuery r (Lazy.StateT s m) where
+    query   = lift query
+    queries = lift . queries
+    update = lift . update
+
+instance MonadQuery r m => MonadQuery r (Strict.StateT s m) where
+    query   = lift query
+    queries = lift . queries
+    update = lift . update
+
+instance (Monoid w, MonadQuery r m) => MonadQuery r (Lazy.WriterT w m) where
+    query   = lift query
+    queries = lift . queries
+    update = lift . update
+
+instance (Monoid w, MonadQuery r m) => MonadQuery r (Strict.WriterT w m) where
+    query   = lift query
+    queries = lift . queries
+    update = lift . update
 
 guardM :: MonadPlus m => m Bool -> m ()
 guardM = (>>= guard)
 {-# INLINE guardM #-}
 
-guard_ :: (MonadPlus m, MonadReader a m) => (a -> Bool) -> m ()
-guard_ f = ask >>= guard . f
+guard_ :: (MonadPlus m, MonadQuery a m) => (a -> Bool) -> m ()
+guard_ f = query >>= guard . f
 {-# INLINE guard_ #-}
 
-guardM_ :: (MonadPlus m, MonadReader a m) => (a -> m Bool) -> m ()
-guardM_ f = ask >>= guardM . f
+guardM_ :: (MonadPlus m, MonadQuery a m) => (a -> m Bool) -> m ()
+guardM_ f = query >>= guardM . f
 {-# INLINE guardM_ #-}
 
 -- | Apply a value-returning predicate. Note that whether or not this return a
 -- 'Just' value, recursion will be performed in the entry itself, if
 -- applicable.
-apply :: (MonadPlus m, MonadReader a m) => (a -> m (Maybe r)) -> m r
-apply = asks >=> (>>= maybe mzero return)
+apply :: (MonadPlus m, MonadQuery a m) => (a -> m (Maybe r)) -> m r
+apply = queries >=> (>>= maybe mzero return)
 {-# INLINE apply #-}
 
 -- | Consider an element, as 'apply', but returning a mutated form of the
 -- element. This can be used to apply optimizations to speed future
 -- conditions.
-consider :: (MonadPlus m, MonadState a m) => (a -> m (Maybe (r, a))) -> m r
-consider = gets >=> (>>= maybe mzero (\(r, a') -> const r `liftM` put a'))
+consider :: (MonadPlus m, MonadQuery a m) => (a -> m (Maybe (r, a))) -> m r
+consider = queries >=> (>>= maybe mzero (\(r, a') -> const r `liftM` update a'))
 {-# INLINE consider #-}
 
 accept :: MonadPlus m => m ()
@@ -327,12 +473,12 @@ prune = CondT $ return (Nothing, Stop)
 --   not.  This differs from simply stating the condition in that it itself
 --   always succeeds.
 --
--- >>> flip runCond "foo.hs" $ matches (guard =<< asks (== "foo.hs"))
+-- >>> flip runCond "foo.hs" $ matches (guard =<< queries (== "foo.hs"))
 -- Just True
--- >>> flip runCond "foo.hs" $ matches (guard =<< asks (== "foo.hi"))
+-- >>> flip runCond "foo.hs" $ matches (guard =<< queries (== "foo.hi"))
 -- Just False
-matches :: (Monad m, Functor m) => CondT a m r -> CondT a m Bool
-matches = liftM isJust . optional
+matches :: MonadPlus m => m r -> m Bool
+matches m = (const True `liftM` m) `mplus` return False
 {-# INLINE matches #-}
 
 -- | A variant of ifM which branches on whether the condition succeeds or not.
@@ -345,10 +491,8 @@ matches = liftM isJust . optional
 -- Just "Success"
 -- >>> flip runCond "foo.hs" $ if_ bad (return "Success") (return "Failure")
 -- Just "Failure"
-if_ :: Monad m => CondT a m r -> CondT a m s -> CondT a m s -> CondT a m s
-if_ c x y = CondT $ do
-    t <- getCondT c
-    getCondT $ maybe y (const x) (fst t)
+if_ :: MonadPlus m => m r -> m s -> m s -> m s
+if_ c x y = matches c >>= \b -> if b then x else y
 {-# INLINE if_ #-}
 
 -- | 'when_' is just like 'when', except that it executes the body if the
@@ -360,7 +504,7 @@ if_ c x y = CondT $ do
 -- Nothing
 -- >>> flip runCond "foo.hs" $ when_ bad ignore
 -- Just ()
-when_ :: Monad m => CondT a m r -> CondT a m s -> CondT a m ()
+when_ :: MonadPlus m => m r -> m s -> m ()
 when_ c x = if_ c (x >> return ()) (return ())
 {-# INLINE when_ #-}
 
@@ -373,7 +517,7 @@ when_ c x = if_ c (x >> return ()) (return ())
 -- Nothing
 -- >>> flip runCond "foo.hs" $ unless_ good ignore
 -- Just ()
-unless_ :: Monad m => CondT a m r -> CondT a m s -> CondT a m ()
+unless_ :: MonadPlus m => m r -> m s -> m ()
 unless_ c x = if_ c (return ()) (x >> return ())
 {-# INLINE unless_ #-}
 
@@ -386,7 +530,7 @@ unless_ c x = if_ c (return ()) (x >> return ())
 -- Just ()
 -- >>> flip runCond "foo.hs" $ or_ [bad]
 -- Nothing
-or_ :: Monad m => [CondT a m r] -> CondT a m r
+or_ :: MonadPlus m => [m r] -> m r
 or_ = Data.Foldable.msum
 {-# INLINE or_ #-}
 
@@ -399,7 +543,7 @@ or_ = Data.Foldable.msum
 -- Nothing
 -- >>> flip runCond "foo.hs" $ and_ [good]
 -- Just ()
-and_ :: Monad m => [CondT a m r] -> CondT a m ()
+and_ :: MonadPlus m => [m r] -> m ()
 and_ = sequence_
 {-# INLINE and_ #-}
 
@@ -411,7 +555,7 @@ and_ = sequence_
 -- Just "Success"
 -- >>> flip runCond "foo.hs" $ not_ good >> return "Shouldn't reach here"
 -- Nothing
-not_ :: Monad m => CondT a m r -> CondT a m ()
+not_ :: MonadPlus m => m r -> m ()
 not_ c = if_ c ignore accept
 {-# INLINE not_ #-}
 

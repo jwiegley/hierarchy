@@ -64,7 +64,7 @@ walk (CofreeT (Select t)) = Select $ for t $ \(a :< mp) ->
 --
 -- @
 --     let files = winnow (directoryFiles ".") $ do
---             path <- ask
+--             path <- query
 --             liftIO $ putStrLn $ "Considering " ++ path
 --             when (path @`elem@` [".@/@.git", ".@/@dist", ".@/@result"])
 --                 prune  -- ignore these, and don't recurse into them

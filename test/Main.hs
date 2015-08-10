@@ -2,7 +2,6 @@ module Main where
 
 import Control.Cond
 import Control.Monad
-import Control.Monad.Reader.Class
 import Data.List
 import Pipes
 import Pipes.Prelude (toListM)
@@ -19,7 +18,7 @@ findsExpected = do
     let ignored = ["./.git", "./dist", "./result"]
 
     let files = winnow (directoryFiles ".") $ do
-            path <- ask
+            path <- query
             liftIO $ putStrLn $ "Considering " ++ path
             when_ (guard_ (`elem` ignored)) $ do
                 liftIO $ putStrLn $ "Pruning " ++ path
