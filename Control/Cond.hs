@@ -181,8 +181,10 @@ instance Monad m => Monad (CondT a m) where
             (v, Continue) -> return (v, Recurse (n >>= k))
             x@_ -> return x
     {-# INLINEABLE (>>=) #-}
+#if __GLASGOW_HASKELL__ >= 710
     {-# SPECIALIZE (>>=)
           :: CondT e IO a -> (a -> CondT e IO b) -> CondT e IO b #-}
+#endif
 
 instance MonadReader r m => MonadReader r (CondT a m) where
     ask = lift R.ask
@@ -219,7 +221,9 @@ instance (Monad m, Functor m) => Alternative (CondT a m) where
             x@(Just _, _) -> return x
             _ -> g
     {-# INLINEABLE (<|>) #-}
+#if __GLASGOW_HASKELL__ >= 710
     {-# SPECIALIZE (<|>) :: CondT a IO a -> CondT a IO a -> CondT a IO a #-}
+#endif
 
 instance Monad m => MonadPlus (CondT a m) where
     mzero = CondT $ return recurse'
@@ -230,7 +234,9 @@ instance Monad m => MonadPlus (CondT a m) where
             x@(Just _, _) -> return x
             _ -> g
     {-# INLINEABLE mplus #-}
+#if __GLASGOW_HASKELL__ >= 710
     {-# SPECIALIZE mplus :: CondT a IO a -> CondT a IO a -> CondT a IO a #-}
+#endif
 
 instance MonadError e m => MonadError e (CondT a m) where
     throwError = CondT . throwError
@@ -325,8 +331,10 @@ runCondT a c@(CondT (StateT s)) = go `liftM` s a
     recursorToMaybe p Continue    = Just p
     recursorToMaybe _ (Recurse n) = Just n
 {-# INLINEABLE runCondT #-}
+#if __GLASGOW_HASKELL__ >= 710
 {-# SPECIALIZE runCondT
       :: a -> CondT a IO r -> IO ((Maybe r, Maybe (CondT a IO r)), a) #-}
+#endif
 
 runCond :: a -> Cond a r -> Maybe r
 runCond = ((fst . fst . runIdentity) .) . runCondT
