@@ -16,7 +16,7 @@ import System.Posix.Files
 -- 'ListT's.
 type TreeT m = CofreeT Maybe (ListT m)
 
--- | Turn an old-style generated list into a 'ListT'.
+-- | Turn a generated list into a 'ListT'.
 selectEach :: Monad m => m [a] -> ListT m a
 selectEach m = Select $ each =<< lift m
 

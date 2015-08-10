@@ -11,7 +11,7 @@ let
       }:
       mkDerivation {
         pname = "hierarchy";
-        version = "0.1.0.0";
+        version = "0.1.0";
         src = ./.;
         libraryHaskellDepends = [
           base directory exceptions free mmorph monad-control mtl pipes
@@ -22,7 +22,7 @@ let
           semigroups transformers unix
         ];
         homepage = "https://github.com/jwiegley/hierarchy";
-        description = "Provide a TreeT type for generating trees, as ListT does for lists";
+        description = "Pipes-based library for predicated traversal of generated trees";
         license = stdenv.lib.licenses.bsd3;
       };
 
