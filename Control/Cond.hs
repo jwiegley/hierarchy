@@ -26,7 +26,8 @@ module Control.Cond
     , accept, ignore, norecurse, prune
 
     -- * Boolean logic
-    , matches, if_, when_, unless_, or_, and_, not_
+    , matches, ifM, whenM, unlessM
+    , if_, when_, unless_, or_, and_, not_
 
     -- * helper functions
     , recurse
@@ -179,7 +180,7 @@ instance Monad m => Monad (CondT a m) where
         (Just r,  Continue)  -> getCondT (k r)
         (Just r,  Recurse n) -> getCondT (k r) >>= \case
             (v, Continue) -> return (v, Recurse (n >>= k))
-            x@_ -> return x
+            x             -> return x
     {-# INLINEABLE (>>=) #-}
 #if __GLASGOW_HASKELL__ >= 710
     {-# SPECIALIZE (>>=)
@@ -220,10 +221,7 @@ instance (Monad m, Functor m) => Alternative (CondT a m) where
         case r of
             x@(Just _, _) -> return x
             _ -> g
-    {-# INLINEABLE (<|>) #-}
-#if __GLASGOW_HASKELL__ >= 710
-    {-# SPECIALIZE (<|>) :: CondT a IO a -> CondT a IO a -> CondT a IO a #-}
-#endif
+    {-# INLINE (<|>) #-}
 
 instance Monad m => MonadPlus (CondT a m) where
     mzero = CondT $ return recurse'
@@ -233,14 +231,13 @@ instance Monad m => MonadPlus (CondT a m) where
         case r of
             x@(Just _, _) -> return x
             _ -> g
-    {-# INLINEABLE mplus #-}
-#if __GLASGOW_HASKELL__ >= 710
-    {-# SPECIALIZE mplus :: CondT a IO a -> CondT a IO a -> CondT a IO a #-}
-#endif
+    {-# INLINE mplus #-}
 
 instance MonadError e m => MonadError e (CondT a m) where
     throwError = CondT . throwError
+    {-# INLINE throwError #-}
     catchError (CondT m) h = CondT $ m `catchError` \e -> getCondT (h e)
+    {-# INLINE catchError #-}
 
 instance MonadThrow m => MonadThrow (CondT a m) where
     throwM = CondT . throwM
@@ -249,10 +246,10 @@ instance MonadThrow m => MonadThrow (CondT a m) where
 instance MonadCatch m => MonadCatch (CondT a m) where
     catch (CondT m) c = CondT $ m `catch` \e -> getCondT (c e)
     {-# INLINE catch #-}
-#if MIN_VERSION_exceptions(0,6,0)
+-- #if MIN_VERSION_exceptions(0,6,0)
 
 instance MonadMask m => MonadMask (CondT a m) where
-#endif
+-- #endif
     mask a = CondT $ mask $ \u -> getCondT (a $ q u)
       where q u = CondT . u . getCondT
     {-# INLINE mask #-}
@@ -273,7 +270,7 @@ instance MonadTrans (CondT a) where
     lift m = CondT $ liftM accept' $ lift m
     {-# INLINE lift #-}
 
-#if MIN_VERSION_monad_control(1,0,0)
+-- #if MIN_VERSION_monad_control(1,0,0)
 instance MonadBaseControl b m => MonadBaseControl b (CondT r m) where
     type StM (CondT r m) a = StM m (CondR r m a, r)
     liftBaseWith f = CondT $ StateT $ \s ->
@@ -282,17 +279,17 @@ instance MonadBaseControl b m => MonadBaseControl b (CondT r m) where
     {-# INLINABLE liftBaseWith #-}
     restoreM = CondT . StateT . const . restoreM
     {-# INLINE restoreM #-}
-#else
-instance MonadBaseControl b m => MonadBaseControl b (CondT r m) where
-    newtype StM (CondT r m) a =
-        CondTStM { unCondTStM :: StM m (Result r m a, r) }
-    liftBaseWith f = CondT $ StateT $ \s ->
-        liftM (\x -> (accept' x, s)) $ liftBaseWith $ \runInBase -> f $ \k ->
-            liftM CondTStM $ runInBase $ runStateT (getCondT k) s
-    {-# INLINEABLE liftBaseWith #-}
-    restoreM = CondT . StateT . const . restoreM . unCondTStM
-    {-# INLINE restoreM #-}
-#endif
+-- #else
+-- instance MonadBaseControl b m => MonadBaseControl b (CondT r m) where
+--     newtype StM (CondT r m) a =
+--         CondTStM { unCondTStM :: StM m (Result r m a, r) }
+--     liftBaseWith f = CondT $ StateT $ \s ->
+--         liftM (\x -> (accept' x, s)) $ liftBaseWith $ \runInBase -> f $ \k ->
+--             liftM CondTStM $ runInBase $ runStateT (getCondT k) s
+--     {-# INLINEABLE liftBaseWith #-}
+--     restoreM = CondT . StateT . const . restoreM . unCondTStM
+--     {-# INLINE restoreM #-}
+-- #endif
 
 instance MFunctor (CondT a) where
     hoist nat (CondT m) = CondT $ hoist nat (fmap (hoist nat) `liftM` m)
@@ -310,6 +307,7 @@ instance MonadCont m => MonadCont (CondT a m) where
 
 instance Monad m => MonadZip (CondT a m) where
     mzipWith = liftM2
+    {-# INLINE mzipWith #-}
 
 -- A deficiency of this instance is that recursion uses the same initial 'a'.
 instance MonadFix m => MonadFix (CondT a m) where
@@ -325,16 +323,14 @@ instance MonadFix m => MonadFix (CondT a m) where
 runCondT :: Monad m => a -> CondT a m r -> m ((Maybe r, Maybe (CondT a m r)), a)
 runCondT a c@(CondT (StateT s)) = go `liftM` s a
   where
+    {-# INLINE go #-}
     go (p, a') = (second (recursorToMaybe c) p, a')
 
+    {-# INLINE recursorToMaybe #-}
     recursorToMaybe _ Stop        = Nothing
     recursorToMaybe p Continue    = Just p
     recursorToMaybe _ (Recurse n) = Just n
-{-# INLINEABLE runCondT #-}
-#if __GLASGOW_HASKELL__ >= 710
-{-# SPECIALIZE runCondT
-      :: a -> CondT a IO r -> IO ((Maybe r, Maybe (CondT a IO r)), a) #-}
-#endif
+{-# INLINE runCondT #-}
 
 runCond :: a -> Cond a r -> Maybe r
 runCond = ((fst . fst . runIdentity) .) . runCondT
@@ -393,85 +389,137 @@ instance Monad m => MonadQuery a (CondT a m) where
 
 instance MonadQuery r m => MonadQuery r (ReaderT r m) where
     query = lift query
+    {-# INLINE query #-}
     queries = lift . queries
+    {-# INLINE queries #-}
     update = lift . update
+    {-# INLINE update #-}
     updates = lift . updates
+    {-# INLINE updates #-}
 
 instance (MonadQuery r m, Monoid w) => MonadQuery r (LazyRWS.RWST r w s m) where
     query = lift query
+    {-# INLINE query #-}
     queries = lift . queries
+    {-# INLINE queries #-}
     update = lift . update
+    {-# INLINE update #-}
     updates = lift . updates
+    {-# INLINE updates #-}
 
 instance (MonadQuery r m, Monoid w)
          => MonadQuery r (StrictRWS.RWST r w s m) where
     query = lift query
+    {-# INLINE query #-}
     queries = lift . queries
+    {-# INLINE queries #-}
     update = lift . update
+    {-# INLINE update #-}
     updates = lift . updates
+    {-# INLINE updates #-}
 
 -- All of these instances need UndecidableInstances, because they do not satisfy
 -- the coverage condition.
 
 instance MonadQuery r' m => MonadQuery r' (ContT r m) where
     query   = lift query
+    {-# INLINE query #-}
     queries = lift . queries
+    {-# INLINE queries #-}
     update = lift . update
+    {-# INLINE update #-}
     updates = lift . updates
+    {-# INLINE updates #-}
 
 instance (Error e, MonadQuery r m) => MonadQuery r (ErrorT e m) where
     query   = lift query
+    {-# INLINE query #-}
     queries = lift . queries
+    {-# INLINE queries #-}
     update = lift . update
+    {-# INLINE update #-}
     updates = lift . updates
+    {-# INLINE updates #-}
 
 instance MonadQuery r m => MonadQuery r (ExceptT e m) where
     query   = lift query
+    {-# INLINE query #-}
     queries = lift . queries
+    {-# INLINE queries #-}
     update = lift . update
+    {-# INLINE update #-}
     updates = lift . updates
+    {-# INLINE updates #-}
 
 instance MonadQuery r m => MonadQuery r (IdentityT m) where
     query   = lift query
+    {-# INLINE query #-}
     queries = lift . queries
+    {-# INLINE queries #-}
     update = lift . update
+    {-# INLINE update #-}
     updates = lift . updates
+    {-# INLINE updates #-}
 
 instance MonadQuery r m => MonadQuery r (ListT m) where
     query   = lift query
+    {-# INLINE query #-}
     queries = lift . queries
+    {-# INLINE queries #-}
     update = lift . update
+    {-# INLINE update #-}
     updates = lift . updates
+    {-# INLINE updates #-}
 
 instance MonadQuery r m => MonadQuery r (MaybeT m) where
     query   = lift query
+    {-# INLINE query #-}
     queries = lift . queries
+    {-# INLINE queries #-}
     update = lift . update
+    {-# INLINE update #-}
     updates = lift . updates
+    {-# INLINE updates #-}
 
 instance MonadQuery r m => MonadQuery r (Lazy.StateT s m) where
     query   = lift query
+    {-# INLINE query #-}
     queries = lift . queries
+    {-# INLINE queries #-}
     update = lift . update
+    {-# INLINE update #-}
     updates = lift . updates
+    {-# INLINE updates #-}
 
 instance MonadQuery r m => MonadQuery r (Strict.StateT s m) where
     query   = lift query
+    {-# INLINE query #-}
     queries = lift . queries
+    {-# INLINE queries #-}
     update = lift . update
+    {-# INLINE update #-}
     updates = lift . updates
+    {-# INLINE updates #-}
 
 instance (Monoid w, MonadQuery r m) => MonadQuery r (Lazy.WriterT w m) where
     query   = lift query
+    {-# INLINE query #-}
     queries = lift . queries
+    {-# INLINE queries #-}
     update = lift . update
+    {-# INLINE update #-}
     updates = lift . updates
+    {-# INLINE updates #-}
 
 instance (Monoid w, MonadQuery r m) => MonadQuery r (Strict.WriterT w m) where
     query   = lift query
+    {-# INLINE query #-}
     queries = lift . queries
+    {-# INLINE queries #-}
     update = lift . update
+    {-# INLINE update #-}
     updates = lift . updates
+    {-# INLINE updates #-}
 
 guardM :: MonadPlus m => m Bool -> m ()
 guardM = (>>= guard)
@@ -533,6 +581,10 @@ matches :: MonadPlus m => m r -> m Bool
 matches m = (const True `liftM` m) `mplus` return False
 {-# INLINE matches #-}
 
+ifM :: Monad m => m Bool -> m s -> m s -> m s
+ifM c x y = c >>= \b -> if b then x else y
+{-# INLINE ifM #-}
+
 -- | A variant of ifM which branches on whether the condition succeeds or not.
 --   Note that @if_ x@ is equivalent to @ifM (matches x)@, and is provided
 --   solely for convenience.
@@ -547,6 +599,10 @@ if_ :: MonadPlus m => m r -> m s -> m s -> m s
 if_ c x y = matches c >>= \b -> if b then x else y
 {-# INLINE if_ #-}
 
+whenM :: Monad m => m Bool -> m s -> m ()
+whenM c x = ifM c (x >> return ()) (return ())
+{-# INLINE whenM #-}
+
 -- | 'when_' is just like 'when', except that it executes the body if the
 --   condition passes, rather than based on a Bool value.
 --
@@ -559,6 +615,10 @@ if_ c x y = matches c >>= \b -> if b then x else y
 when_ :: MonadPlus m => m r -> m s -> m ()
 when_ c x = if_ c (x >> return ()) (return ())
 {-# INLINE when_ #-}
+
+unlessM :: Monad m => m Bool -> m s -> m ()
+unlessM c x = ifM c (return ()) (x >> return ())
+{-# INLINE unlessM #-}
 
 -- | 'when_' is just like 'when', except that it executes the body if the
 --   condition fails, rather than based on a Bool value.
