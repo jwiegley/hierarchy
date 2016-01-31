@@ -563,8 +563,7 @@ norecurse :: Monad m => CondT a m ()
 norecurse = CondT $ return (Just (), Stop)
 {-# INLINE norecurse #-}
 
--- | 'prune' is a synonym for both ignoring an entry and its descendents. It
---   is the same as @ignore >> norecurse@.
+-- | 'prune' is a synonym for both ignoring an entry and its descendents.
 prune :: Monad m => CondT a m r
 prune = CondT $ return (Nothing, Stop)
 {-# INLINE prune #-}
