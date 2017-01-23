@@ -161,7 +161,7 @@ instance (Monad m, Monoid r) => Monoid (CondT a m r) where
     mappend = liftM2 mappend
     {-# INLINE mappend #-}
 
-instance (Monad m, Functor m) => Applicative (CondT a m) where
+instance Monad m => Applicative (CondT a m) where
     pure  = return
     {-# INLINE pure #-}
     (<*>) = ap
@@ -182,10 +182,10 @@ instance Monad m => Monad (CondT a m) where
             (v, Continue) -> return (v, Recurse (n >>= k))
             x             -> return x
     {-# INLINEABLE (>>=) #-}
-#if __GLASGOW_HASKELL__ >= 710
-    {-# SPECIALIZE (>>=)
-          :: CondT e IO a -> (a -> CondT e IO b) -> CondT e IO b #-}
-#endif
+-- #if __GLASGOW_HASKELL__ >= 710
+--     {-# SPECIALIZE (>>=)
+--           :: CondT e IO a -> (a -> CondT e IO b) -> CondT e IO b #-}
+-- #endif
 
 instance MonadReader r m => MonadReader r (CondT a m) where
     ask = lift R.ask
@@ -213,7 +213,7 @@ instance MonadState s m => MonadState s (CondT a m) where
     state = lift . S.state
     {-# INLINE state #-}
 
-instance (Monad m, Functor m) => Alternative (CondT a m) where
+instance Monad m => Alternative (CondT a m) where
     empty = CondT $ return recurse'
     {-# INLINE empty #-}
     CondT f <|> CondT g = CondT $ do
