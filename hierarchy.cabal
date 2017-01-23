@@ -1,5 +1,5 @@
 name:          hierarchy
-version:       0.3.1
+version:       0.3.1.1
 synopsis:      Pipes-based library for predicated traversal of generated trees
 description:   Pipes-based library for predicated traversal of generated trees
 homepage:      https://github.com/jwiegley/hierarchy
@@ -23,10 +23,10 @@ library
       Control.Cond
     , Pipes.Tree
   build-depends:       
-      base                >=4.7  && <4.9
-    , transformers        >=0.3  && <0.5
-    , transformers-base   >=0.3  && <0.5
-    , transformers-compat >=0.3  && <0.5
+      base                >=4.7  && <4.10
+    , transformers        >=0.3  && <0.6
+    , transformers-base   >=0.3  && <0.6
+    , transformers-compat >=0.3  && <0.6
     , exceptions          >=0.8  && <0.9
     , mmorph              >=1.0  && <1.1
     , mtl                 >=2.1  && <2.3
@@ -58,7 +58,7 @@ test-suite test
       base >=3
     , hierarchy
     , pipes              >=4.1  && <4.2
-    , transformers       >=0.3  && <0.5
+    , transformers       >=0.3  && <0.6
     , mtl                >=2.1  && <2.3
     , hspec              >=1.4.4
     , hspec-expectations >=0.3
