@@ -3,7 +3,6 @@
 
 module Pipes.Tree where
 
-import Control.Applicative
 import Control.Comonad.Trans.Cofree
 import Control.Cond
 import Pipes
