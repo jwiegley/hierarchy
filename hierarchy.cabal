@@ -1,7 +1,7 @@
 name:          hierarchy
 version:       0.3.1.2
 synopsis:      Pipes-based library for predicated traversal of generated trees
-description:   Pipes-based library for predicated traversal of generated trees
+description:   Pipes-based library for predicated traversal of generated trees.
 homepage:      https://github.com/jwiegley/hierarchy
 license:       BSD3
 license-file:  LICENSE
@@ -17,7 +17,7 @@ Source-repository head
   location: git://github.com/jwiegley/hierarchy.git
 
 library
-  ghc-options:      -Wall -O2 -funbox-strict-fields
+  ghc-options:      -Wall -funbox-strict-fields
   include-dirs:     .
   exposed-modules:     
       Control.Cond
