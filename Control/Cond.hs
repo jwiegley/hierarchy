@@ -94,11 +94,11 @@ instance MFunctor (Recursor a) where
 
 type CondR a m r = (Maybe r, Recursor a m r)
 
-accept' :: Monad m => r -> CondR a m r
+accept' :: r -> CondR a m r
 accept' x = (Just x, Continue)
 {-# INLINE accept' #-}
 
-recurse' :: Monad m => CondR a m r
+recurse' :: CondR a m r
 recurse' = (Nothing, Continue)
 {-# INLINE recurse' #-}
 
