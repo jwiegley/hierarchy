@@ -1,21 +1,37 @@
-{ mkDerivation, base, directory, exceptions, free, mmorph
-, monad-control, mtl, pipes, semigroups, stdenv, transformers
-, transformers-base, unix, doctest, hspec, hspec-expectations
-, transformers-compat, attoparsec, bytestring, text, time, filepath
-, posix-paths, unix-compat, regex-posix, pipes-safe
+{ compiler    ? "ghc822" # "ghc842" also works
+, doProfiling ? false
+, doBenchmark ? false
+, doTracing   ? false
+, doStrict    ? false
+, rev         ? "255a833e841628c0b834575664eae373e28cdc27"
+, sha256      ? "022xm1pf4fpjjy69g7qz6rpqnwpjcy1l0vj49m8xmgn553cs42ch"
+# , nixpkgs     ? import ((import <nixpkgs> {}).fetchFromGitHub {
+#     owner = "NixOS"; repo = "nixpkgs"; inherit rev sha256; }) {
+, nixpkgs     ? import (builtins.fetchTarball {
+    url = "https://github.com/NixOS/nixpkgs/archive/${rev}.tar.gz";
+    inherit sha256; }) {
+    config.allowUnfree = true;
+    config.allowBroken = false;
+  }
 }:
-mkDerivation {
-  pname = "hierarchy";
-  version = "0.3.1";
-  src = ./.;
-  libraryHaskellDepends = [
-    base directory exceptions free mmorph monad-control mtl pipes
-    semigroups transformers transformers-base transformers-compat unix
-    attoparsec bytestring text time filepath posix-paths unix-compat
-    regex-posix pipes-safe
-  ];
-  testHaskellDepends = [ doctest hspec hspec-expectations ];
-  homepage = "https://github.com/jwiegley/hierarchy";
-  description = "Provide a TreeT type for generating trees, as ListT does for lists";
-  license = stdenv.lib.licenses.bsd3;
+
+let inherit (nixpkgs) pkgs;
+
+  haskellPackages = pkgs.haskell.packages.${compiler}.override {
+    overrides = with pkgs.haskell.lib; self: super: rec {
+    };
+  };
+
+in haskellPackages.developPackage {
+  root = ./.;
+
+  source-overrides = {
+  };
+
+  modifier = drv: pkgs.haskell.lib.overrideCabal drv (attrs: {
+    enableLibraryProfiling    = doProfiling;
+    enableExecutableProfiling = doProfiling;
+
+    inherit doBenchmark;
+  });
 }

@@ -1,0 +1,47 @@
+-- This file has been generated from package.yaml by hpack version 0.27.0.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: e90a729edd856e3117b7db4385249bac51b595bc099857094badfaeac4fa77b3
+
+name:           streaming-hierarchy
+version:        0.3.1.5
+synopsis:       Predicated traversal of generated trees
+description:    Predicated traversal of generated trees.
+category:       Data
+homepage:       https://github.com/jwiegley/hierarchy#readme
+bug-reports:    https://github.com/jwiegley/hierarchy/issues
+author:         John Wiegley
+maintainer:     johnw@newartisans.com
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+cabal-version:  >= 1.10
+
+source-repository head
+  type: git
+  location: https://github.com/jwiegley/hierarchy
+
+library
+  exposed-modules:
+      Control.Cond
+      Hierarchy
+  other-modules:
+      Paths_streaming_hierarchy
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.7 && <4.12
+    , exceptions >=0.8 && <0.9
+    , free >=4.12 && <6
+    , mmorph >=1.0 && <1.2
+    , monad-control >=1.0 && <1.1
+    , mtl >=2.1 && <2.4
+    , streaming >=0.2.1 && <1
+    , transformers >=0.3 && <0.7
+    , transformers-base >=0.3 && <0.7
+    , transformers-compat >=0.3 && <0.7
+  if impl(ghc < 8.2.0)
+    build-depends:
+        semigroups >=0.16 && <0.19
+  default-language: Haskell2010
