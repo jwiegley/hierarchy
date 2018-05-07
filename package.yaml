@@ -1,0 +1,39 @@
+name:       hierarchy
+version:    0.3.1.5
+synopsis:   Predicated traversal of generated trees
+github:     jwiegley/hierarchy
+author:     John Wiegley
+maintainer: johnw@newartisans.com
+category:   Data
+license:    BSD3
+
+description:
+  Predicated traversal of generated trees.
+
+dependencies:
+  - base                >=4.7   && <4.12
+  - exceptions          >=0.8   && <0.9
+  - free                >=4.12  && <6
+  - mmorph              >=1.0   && <1.2
+  - monad-control       >=1.0   && <1.1
+  - mtl                 >=2.1   && <2.4
+  - logict              >=0.6   && <1
+  - transformers        >=0.3   && <0.7
+  - transformers-base   >=0.3   && <0.7
+  - transformers-compat >=0.3   && <0.7
+when:
+  - condition: impl(ghc < 8.2.0)
+    dependencies:
+      - semigroups      >=0.16  && <0.19
+
+library:
+  source-dirs: src
+
+tests:
+  doctests:
+    main: doctest.hs
+    source-dirs: test
+    dependencies:      
+      - directory    >=1.0
+      - doctest      >=0.8
+      - filepath     >=1.3

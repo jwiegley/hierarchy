@@ -1,32 +1,37 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Pipes.Tree where
+module Hierarchy where
 
 import Control.Comonad.Trans.Cofree
 import Control.Cond
-import Pipes
+import Control.Monad.Logic
+
+type ListT = LogicT
 
 -- | A 'TreeT' is a tree of values, where the (possible) branches are
 -- 'ListT's.
 type TreeT m = CofreeT Maybe (ListT m)
 
+considering :: [a] -> LogicT m a
+considering xs = LogicT $ \c n -> foldr c n xs
+
 -- | Turn a generated list into a 'ListT'.
 selectEach :: Monad m => m [a] -> ListT m a
-selectEach m = Select $ each =<< lift m
+selectEach = lift >=> considering
 
 -- | Descend one level into a 'TreeT', yielding a list of values and their
 -- possible associated trees.
 descend :: Monad m => TreeT m a -> ListT m (a, Maybe (TreeT m a))
-descend (CofreeT (Select t)) = Select $ for t $ \(a :< mp) -> yield (a, mp)
+descend (CofreeT t) = t >>- \(a :< mp) -> pure (a, mp)
 {-# INLINE descend #-}
 
 -- | Perform a depth-first traversal of a 'TreeT', yielding a 'ListT' of its
 -- contents. Note that breadth-first traversals cannot offer static memory
 -- guarantees, so they are not provided by this module.
 walk :: Monad m => TreeT m a -> ListT m a
-walk (CofreeT (Select t)) = Select $ for t $ \(a :< mp) ->
-    yield a >> maybe (return ()) (enumerate . walk) mp
+walk (CofreeT t) = t >>- \(a :< (mp :: Maybe (TreeT m a))) ->
+    LogicT $ \c n -> c a (maybe n (\p -> unLogicT (walk p) c n) mp)
 {-# INLINEABLE walk #-}
 
 -- | Given a 'TreeT', produce another 'TreeT' which yields only those elements
@@ -45,12 +50,12 @@ walk (CofreeT (Select t)) = Select $ for t $ \(a :< mp) ->
 --             when (path @`elem@` [".@/@.git", ".@/@dist", ".@/@result"])
 --                 prune  -- ignore these, and don't recurse into them
 --             guard_ (".hs" @`isInfixOf@`)  -- implicitly references 'path'
---     runEffect $ for (enumerate (walk files)) $ liftIO . print
+--     runEffect $ for (runListT (walk files)) $ liftIO . print
 -- @
 winnow :: Monad m => TreeT m a -> CondT a m () -> TreeT m a
-winnow (CofreeT (Select t)) p = CofreeT $ Select $ for t $ \(a :< mst) -> do
+winnow (CofreeT t) p = CofreeT $ t >>- \(a :< mst) -> do
     (mval, mnext) <- lift $ execCondT a p
     let mnext' = winnow <$> mst <*> mnext
     case mval of
-        Nothing -> maybe (return ()) (enumerate . runCofreeT) mnext'
-        Just a' -> yield (a' :< mnext')
+        Nothing -> maybe mzero runCofreeT mnext'
+        Just a' -> pure (a' :< mnext')
