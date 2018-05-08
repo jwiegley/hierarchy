@@ -5,7 +5,7 @@
 -- hash: 2596f3b56ac8cc1f0530263376774a0928ed672af04accda1fdf311d298fb764
 
 name:           hierarchy
-version:        1.0.0
+version:        1.0.1
 synopsis:       Predicated traversal of generated trees
 description:    Predicated traversal of generated trees.
 category:       Data
