@@ -12,9 +12,6 @@ import Control.Cond
 type TreeT m = CofreeT Maybe m
 
 -- | Turn a list into a series of possibilities:
---
--- >>> observeAllT $ considering [1,2,3]
--- [1,2,3]
 select :: MonadPlus m => [a] -> m a
 select = msum . map pure
 
