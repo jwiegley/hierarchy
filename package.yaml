@@ -1,5 +1,5 @@
 name:       hierarchy
-version:    0.3.1.5
+version:    1.0.0
 synopsis:   Predicated traversal of generated trees
 github:     jwiegley/hierarchy
 author:     John Wiegley
@@ -17,7 +17,6 @@ dependencies:
   - mmorph              >=1.0   && <1.2
   - monad-control       >=1.0   && <1.1
   - mtl                 >=2.1   && <2.4
-  - logict              >=0.6   && <1
   - transformers        >=0.3   && <0.7
   - transformers-base   >=0.3   && <0.7
   - transformers-compat >=0.3   && <0.7
