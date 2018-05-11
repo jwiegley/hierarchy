@@ -2,10 +2,10 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 5c7bf705712ad14978b1e1ad4b374eaf0c5d94fcb844a78967f2563eafe964d4
+-- hash: 7748f3ca1f7405c760d01c22deb293079ce8eb68885b1e66a38b43b171c044eb
 
 name:           hierarchy
-version:        1.0.0
+version:        1.0.2
 synopsis:       Predicated traversal of generated trees
 description:    Predicated traversal of generated trees.
 category:       Data
