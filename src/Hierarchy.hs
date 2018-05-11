@@ -8,7 +8,7 @@ import Control.Comonad.Trans.Cofree
 import Control.Cond
 
 -- | A 'TreeT' is a tree of values, where the (possible) branches are
---   'ListT's over some Monad 'm'.
+--   represented by some MonadPlus 'm'.
 type TreeT m = CofreeT Maybe m
 
 -- | Turn a list into a series of possibilities:
@@ -21,7 +21,7 @@ descend :: MonadPlus m => TreeT m a -> m (a, Maybe (TreeT m a))
 descend (CofreeT t) = t >>= \(a :< mp) -> pure (a, mp)
 {-# INLINE descend #-}
 
--- | Perform a depth-first traversal of a 'TreeT', yielding a 'ListT' of its
+-- | Perform a depth-first traversal of a 'TreeT', yielding each of its
 --   contents. Note that breadth-first traversals cannot offer static memory
 --   guarantees, so they are not provided by this module.
 walk :: MonadPlus m => TreeT m a -> m a
@@ -44,7 +44,7 @@ walk (CofreeT t) = t >>= \(a :< mp) -> pure a `mplus` maybe mzero walk mp
 --         when (path @`elem@` [".@/@.git", ".@/@dist", ".@/@result"])
 --             prune  -- ignore these, and don't recurse into them
 --         guard_ (".hs" @`isInfixOf@`)  -- implicitly references 'path'
--- runEffect $ for (runListT (walk files)) $ liftIO . print
+-- forM_ (walk files) $ liftIO . print
 -- @
 winnow :: MonadPlus m => TreeT m a -> CondT a m () -> TreeT m a
 winnow (CofreeT t) p = CofreeT $ t >>= \(a :< mst) -> do
