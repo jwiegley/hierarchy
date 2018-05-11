@@ -26,6 +26,7 @@ in haskellPackages.developPackage {
   root = ./.;
 
   source-overrides = {
+    exceptions = "0.10.0";
   };
 
   modifier = drv: pkgs.haskell.lib.overrideCabal drv (attrs: {
